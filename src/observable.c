@@ -248,7 +248,7 @@ void flecs_emit_propagate(
 
     if (ecs_should_log_3()) {
         char *idstr = ecs_id_str(world, tgt_idr->id);
-        ecs_dbg_3("propagate events/invalidate cache for %s", idstr);
+        ecs_dbg_3("propagate events/invalidate reachable for %s", idstr);
         ecs_os_free(idstr);
     }
     ecs_log_push_3();
@@ -329,7 +329,7 @@ void flecs_emit_propagate_invalidate_tables(
 
     if (ecs_should_log_3()) {
         char *idstr = ecs_id_str(world, tgt_idr->id);
-        ecs_dbg_3("invalidate reachable cache for %s", idstr);
+        ecs_dbg_3("reachable: invalidate cache for %s", idstr);
         ecs_os_free(idstr);
     }
 
@@ -689,10 +689,10 @@ void flecs_emit_dump_cache(
         ecs_reachable_elem_t *elem = &elems[i];
         char *idstr = ecs_id_str(world, elem->id);
         char *estr = ecs_id_str(world, elem->src);
-        ecs_dbg_3("- id: %s (%u), src: %s (%u), table: %p", 
+        ecs_dbg_3("- id: %s (%u), src: %s (%u), table: %u", 
             idstr, (uint32_t)elem->id,
             estr, (uint32_t)elem->src,
-            elem->table);
+            (uint32_t)elem->table->id);
         ecs_os_free(idstr);
         ecs_os_free(estr);
     }
@@ -842,7 +842,7 @@ void flecs_emit_forward_table_up(
 
         if (ecs_should_log_3()) {
             char *idstr = ecs_id_str(world, tgt_idr->id);
-            ecs_dbg_3("cache revalidated for %s:", idstr);
+            ecs_dbg_3("reachable: cache revalidated for %s:", idstr);
             ecs_os_free(idstr);
             flecs_emit_dump_cache(world, &rc->ids);
         }
@@ -893,7 +893,7 @@ void flecs_emit_forward(
         /* Cache miss, iterate the tree to find ids to forward */
         if (ecs_should_log_3()) {
             char *idstr = ecs_id_str(world, idr->id);
-            ecs_dbg_3("reachable cache miss for %s", idstr);
+            ecs_dbg_3("reachable: cache miss for %s", idstr);
             ecs_os_free(idstr);
         }
         ecs_log_push_3();
@@ -912,7 +912,7 @@ void flecs_emit_forward(
         }
 
         if (ecs_should_log_3()) {
-            ecs_dbg_3("cache after rebuild:");
+            ecs_dbg_3("reachable: cache after rebuild:");
             flecs_emit_dump_cache(world, &rc->ids);
         }
 
@@ -921,7 +921,7 @@ void flecs_emit_forward(
         /* Cache hit, use cached values instead of walking the tree */
         if (ecs_should_log_3()) {
             char *idstr = ecs_id_str(world, idr->id);
-            ecs_dbg_3("reachable cache hit for %s", idstr);
+            ecs_dbg_3("reachable: cache hit for %s", idstr);
             ecs_os_free(idstr);
             flecs_emit_dump_cache(world, &rc->ids);
         }
@@ -1073,6 +1073,20 @@ void flecs_emit(
      * relationship should emit UnSet events. This is part of the behavior that
      * allows observers to be agnostic of whether a component is inherited. */
     bool can_unset = count && (event == EcsOnRemove) && !no_on_set;
+
+    /* If a structural change happened to a table with observers, propagate
+     * a dirty state upwards to the down traversal cache. */
+    if ((event == EcsOnAdd) || (event == EcsOnRemove)) {
+        /* Invalidate id records for changed entities, if there are any */
+        if (flecs_trav_down_invalidate_range(world, table, offset, count)) {
+            /* Range for which event is triggered contained entities with
+             * acyclic relationships, invalidate upwards for down cache. */
+            flecs_trav_down_invalidate_table(world, table);
+            if (it.other_table) {
+                flecs_trav_down_invalidate_table(world, it.other_table);
+            }
+        }
+    }
 
     ecs_event_id_record_t *iders[5] = {0};
     int32_t unset_count = 0;

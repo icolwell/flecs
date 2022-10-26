@@ -4441,8 +4441,6 @@ void Observer_cache_test_11() {
     ecs_run_aperiodic(world, 0);
 
     test_assert(true); // ensure cache revalidation didn't assert
-
-    ecs_fini(world);
 }
 
 void Observer_cache_test_12() {
@@ -4570,6 +4568,44 @@ void Observer_cache_test_15() {
     test_assert(!ecs_is_alive(world, e1));
     test_assert(!ecs_is_alive(world, e0));
     test_assert(ecs_is_alive(world, r));
+
+    ecs_fini(world);
+}
+
+void Observer_cache_test_15() {
+    ecs_world_t *world = ecs_mini();
+
+    ECS_ENTITY(world, R, Acyclic);
+    ECS_TAG(world, Tag);
+
+    ecs_entity_t e1 = ecs_new(world, Tag);
+    ecs_entity_t e2 = ecs_new(world, Tag);
+    ecs_entity_t e3 = ecs_new(world, Tag);
+    ecs_entity_t e4 = ecs_new(world, Tag);
+
+    ecs_add_pair(world, e1, R, e4);
+    ecs_add_pair(world, e2, R, e3);
+    ecs_add_pair(world, e3, R, e1);
+
+    ecs_query(world, {
+        .filter.terms = {
+            { Tag },
+            { Tag, .src = {
+                .trav = R,
+                .flags = EcsUp
+            }}
+        }
+    });
+
+    ecs_delete(world, R);
+
+    test_assert(!ecs_has_pair(world, e1, R, e4));
+    test_assert(!ecs_has_pair(world, e2, R, e3));
+    test_assert(!ecs_has_pair(world, e3, R, e1));
+
+    test_assert(ecs_has(world, e1, Tag));
+    test_assert(ecs_has(world, e2, Tag));
+    test_assert(ecs_has(world, e3, Tag));
 
     ecs_fini(world);
 }

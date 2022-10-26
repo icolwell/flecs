@@ -1072,6 +1072,7 @@ void Filter_filter_iter_superset_only_w_owned(void);
 void Filter_filter_iter_superset_after_add(void);
 void Filter_filter_iter_superset_after_remove(void);
 void Filter_filter_iter_superset_after_clear(void);
+void Filter_filter_iter_superset_after_clear_parent(void);
 void Filter_filter_iter_superset_after_delete(void);
 void Filter_filter_iter_2_terms_superset_2_rel_instances(void);
 void Filter_filter_iter_2_terms_superset_2_rel_instances_match_2nd(void);
@@ -1083,6 +1084,8 @@ void Filter_filter_iter_superset_2_relations_instanced(void);
 void Filter_filter_iter_superset_2_relations_w_component(void);
 void Filter_filter_iter_superset_2_relations_instanced_w_component(void);
 void Filter_filter_iter_not_up_disabled(void);
+void Filter_filter_iter_isa_redo_2_lvls(void);
+void Filter_filter_iter_childof_redo_from_isa(void);
 void Filter_filter_w_10_terms(void);
 void Filter_filter_w_10_terms_move(void);
 void Filter_filter_w_10_terms_copy(void);
@@ -6464,6 +6467,10 @@ bake_test_case Filter_testcases[] = {
         Filter_filter_iter_superset_after_clear
     },
     {
+        "filter_iter_superset_after_clear_parent",
+        Filter_filter_iter_superset_after_clear_parent
+    },
+    {
         "filter_iter_superset_after_delete",
         Filter_filter_iter_superset_after_delete
     },
@@ -6506,6 +6513,14 @@ bake_test_case Filter_testcases[] = {
     {
         "filter_iter_not_up_disabled",
         Filter_filter_iter_not_up_disabled
+    },
+    {
+        "filter_iter_isa_redo_2_lvls",
+        Filter_filter_iter_isa_redo_2_lvls
+    },
+    {
+        "filter_iter_childof_redo_from_isa",
+        Filter_filter_iter_childof_redo_from_isa
     },
     {
         "filter_w_10_terms",
@@ -11690,7 +11705,7 @@ static bake_test_suite suites[] = {
         "Filter",
         NULL,
         NULL,
-        257,
+        260,
         Filter_testcases
     },
     {
