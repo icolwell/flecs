@@ -264,7 +264,7 @@ const ecs_trav_down_t* flecs_trav_down(
         return NULL;
     }
 
-    ecs_id_record_t *idr_trav = flecs_id_record_try(world, 
+    ecs_id_record_t *idr_trav = flecs_id_record_try(world,
         ecs_pair(trav, entity));
     if (!idr_trav) {
         /* Id violates constraint */

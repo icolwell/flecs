@@ -2115,7 +2115,9 @@ void flecs_id_mark_for_delete(
     }
 
     /* Signal query cache monitors */
-    flecs_update_monitors_for_delete(world, id);
+    if (flecs_table_cache_count(&idr->cache)) {
+        flecs_update_monitors_for_delete(world, id);
+    }
 
     /* If id is a wildcard pair, update cache monitors for non-wildcard ids */
     if (ecs_id_is_wildcard(id)) {
@@ -2123,13 +2125,17 @@ void flecs_id_mark_for_delete(
         ecs_id_record_t *cur = idr;
         if (ECS_PAIR_SECOND(id) == EcsWildcard) {
             while ((cur = cur->first.next)) {
-                flecs_update_monitors_for_delete(world, cur->id);
+                if (flecs_table_cache_count(&cur->cache)) {
+                    flecs_update_monitors_for_delete(world, cur->id);
+                }
             }
         } else {
             ecs_assert(ECS_PAIR_FIRST(id) == EcsWildcard, 
                 ECS_INTERNAL_ERROR, NULL);
             while ((cur = cur->second.next)) {
-                flecs_update_monitors_for_delete(world, cur->id);
+                if (flecs_table_cache_count(&cur->cache)) {
+                    flecs_update_monitors_for_delete(world, cur->id);
+                }
             }
         }
     }
