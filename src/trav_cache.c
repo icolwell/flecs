@@ -27,8 +27,8 @@ ecs_trav_down_t* flecs_trav_down_ensure(
     ecs_trav_down_cache_t *cache,
     ecs_id_t with)
 {
-    ecs_map_init_if(&cache->with, ecs_trav_down_t, a, 1);
-    ecs_trav_down_t *trav = ecs_map_ensure(&cache->with, ecs_trav_down_t, with);
+    ecs_map_init_if(&cache->with, a);
+    ecs_trav_down_t *trav = ecs_map_ensure_alloc_t(&cache->with, ecs_trav_down_t, with);
     if (!trav->current) {
         trav->current = -1;
     }
@@ -64,7 +64,6 @@ static
 ecs_trav_down_t* flecs_trav_table_down(
     ecs_world_t *world,
     ecs_allocator_t *a,
-    ecs_trav_down_cache_t *cache,
     ecs_trav_down_t *dst,
     ecs_entity_t trav,
     const ecs_table_t *table,
@@ -209,8 +208,8 @@ ecs_trav_down_t* flecs_trav_entity_down(
              * earlier (trav, *) pair. The reason this information is not
              * cached is that a component can be added to a preceding pair
              * without invalidating the cache for this pair. */
-            int32_t column = tr->column;
-            int32_t trav_column = 0;
+            int16_t column = flecs_ito(int16_t, tr->column);
+            int16_t trav_column = 0;
             if (column) {
                 ecs_id_t id = table->type.array[column - 1];
                 if (ECS_IS_PAIR(id) && ECS_PAIR_FIRST(id) == trav) {
@@ -238,8 +237,7 @@ ecs_trav_down_t* flecs_trav_entity_down(
         ecs_trav_elem_t *elem = ecs_vec_get_t(
             &dst->elems, ecs_trav_elem_t, t);
         if (!elem->leaf) {
-            flecs_trav_table_down(world, a, cache, dst, trav,
-                elem->table, idr_with);
+            flecs_trav_table_down(world, a, dst, trav, elem->table, idr_with);
         }
     }
 
@@ -264,10 +262,19 @@ const ecs_trav_down_t* flecs_trav_down(
         return NULL;
     }
 
-    ecs_id_record_t *idr_trav = flecs_id_record_try(world,
+    ecs_id_record_t *idr_trav = flecs_id_record_get(world, 
         ecs_pair(trav, entity));
     if (!idr_trav) {
-        /* Id violates constraint */
+        /* If the traversed relationship is not IsA but the entity is used as
+         * target for IsA relationships, it is possible that the requested id
+         * is reachable through inheritance. */
+        if (trav != EcsIsA) {
+            if (flecs_id_record_get(world, ecs_pair(EcsIsA, entity)) != NULL) {
+                idr_trav = flecs_id_record_try(world, ecs_pair(trav, entity));
+            }
+        }
+    }
+    if (!idr_trav) {
         return NULL;
     }
 
@@ -406,6 +413,8 @@ bool flecs_trav_down_invalidate_range(
     int32_t offset,
     int32_t count)
 {
+    (void)world;
+
     bool has_observed = false;
 
     if (table->observed_count) {
@@ -437,8 +446,8 @@ void flecs_trav_down_fini(
     ecs_trav_down_cache_t *cache)
 {
     ecs_map_iter_t it = ecs_map_iter(&cache->with);
-    ecs_trav_down_t *entry;
-    while ((entry = ecs_map_next(&it, ecs_trav_down_t, 0))) {
+    while (ecs_map_next(&it)) {
+        ecs_trav_down_t *entry = ecs_map_ptr(&it);
         ecs_vec_fini_t(a, &entry->elems, ecs_trav_elem_t);
     }
     ecs_map_fini(&cache->with);

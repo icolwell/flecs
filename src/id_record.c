@@ -131,7 +131,7 @@ ecs_id_t flecs_id_record_hash(
 typedef struct ecs_id_validate_result_t {
     ecs_entity_t rel;
     ecs_entity_t tgt;
-    char *error_msg;
+    const char *error_msg;
 } ecs_id_validate_result_t;
 
 static
@@ -203,7 +203,7 @@ ecs_id_record_t* flecs_id_record_new(
     }
 
     ecs_entity_t rel = check.rel, tgt = check.tgt, role = id & ECS_ID_FLAGS_MASK;
-    ecs_id_record_t *idr, **idr_ptr, *idr_t = NULL;
+    ecs_id_record_t *idr, *idr_t = NULL;
     ecs_id_t hash = flecs_id_record_hash(id);
     if (hash >= ECS_HI_ID_RECORD_ID) {
         idr = flecs_bcalloc(&world->allocators.id_record);

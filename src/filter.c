@@ -2381,13 +2381,13 @@ ecs_iter_t flecs_filter_iter_w_flags(
         flecs_process_pending_tables(world);
     }
 
-    ecs_iter_t it = {
-        .real_world = (ecs_world_t*)world,
-        .world = (ecs_world_t*)stage,
-        .terms = filter ? filter->terms : NULL,
-        .next = ecs_filter_next,
-        .flags = flags
-    };
+    ecs_iter_t it;
+    ecs_os_zeromem(&it);
+    it.real_world = (ecs_world_t*)world;
+    it.world = (ecs_world_t*)stage;
+    it.terms = filter ? filter->terms : NULL;
+    it.next = ecs_filter_next;
+    it.flags = flags;
 
     ecs_filter_iter_t *iter = &it.priv.iter.filter;
     iter->pivot_term = -1;

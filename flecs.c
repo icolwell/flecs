@@ -15976,8 +15976,8 @@ ecs_trav_down_t* flecs_trav_down_ensure(
     ecs_trav_down_cache_t *cache,
     ecs_id_t with)
 {
-    ecs_map_init_if(&cache->with, ecs_trav_down_t, a, 1);
-    ecs_trav_down_t *trav = ecs_map_ensure(&cache->with, ecs_trav_down_t, with);
+    ecs_map_init_if(&cache->with, a);
+    ecs_trav_down_t *trav = ecs_map_ensure_alloc_t(&cache->with, ecs_trav_down_t, with);
     if (!trav->current) {
         trav->current = -1;
     }
@@ -16013,7 +16013,6 @@ static
 ecs_trav_down_t* flecs_trav_table_down(
     ecs_world_t *world,
     ecs_allocator_t *a,
-    ecs_trav_down_cache_t *cache,
     ecs_trav_down_t *dst,
     ecs_entity_t trav,
     const ecs_table_t *table,
@@ -16158,8 +16157,8 @@ ecs_trav_down_t* flecs_trav_entity_down(
              * earlier (trav, *) pair. The reason this information is not
              * cached is that a component can be added to a preceding pair
              * without invalidating the cache for this pair. */
-            int32_t column = tr->column;
-            int32_t trav_column = 0;
+            int16_t column = flecs_ito(int16_t, tr->column);
+            int16_t trav_column = 0;
             if (column) {
                 ecs_id_t id = table->type.array[column - 1];
                 if (ECS_IS_PAIR(id) && ECS_PAIR_FIRST(id) == trav) {
@@ -16187,8 +16186,7 @@ ecs_trav_down_t* flecs_trav_entity_down(
         ecs_trav_elem_t *elem = ecs_vec_get_t(
             &dst->elems, ecs_trav_elem_t, t);
         if (!elem->leaf) {
-            flecs_trav_table_down(world, a, cache, dst, trav,
-                elem->table, idr_with);
+            flecs_trav_table_down(world, a, dst, trav, elem->table, idr_with);
         }
     }
 
@@ -16213,10 +16211,19 @@ const ecs_trav_down_t* flecs_trav_down(
         return NULL;
     }
 
-    ecs_id_record_t *idr_trav = flecs_id_record_try(world,
+    ecs_id_record_t *idr_trav = flecs_id_record_get(world, 
         ecs_pair(trav, entity));
     if (!idr_trav) {
-        /* Id violates constraint */
+        /* If the traversed relationship is not IsA but the entity is used as
+         * target for IsA relationships, it is possible that the requested id
+         * is reachable through inheritance. */
+        if (trav != EcsIsA) {
+            if (flecs_id_record_get(world, ecs_pair(EcsIsA, entity)) != NULL) {
+                idr_trav = flecs_id_record_try(world, ecs_pair(trav, entity));
+            }
+        }
+    }
+    if (!idr_trav) {
         return NULL;
     }
 
@@ -16355,6 +16362,8 @@ bool flecs_trav_down_invalidate_range(
     int32_t offset,
     int32_t count)
 {
+    (void)world;
+
     bool has_observed = false;
 
     if (table->observed_count) {
@@ -16386,8 +16395,8 @@ void flecs_trav_down_fini(
     ecs_trav_down_cache_t *cache)
 {
     ecs_map_iter_t it = ecs_map_iter(&cache->with);
-    ecs_trav_down_t *entry;
-    while ((entry = ecs_map_next(&it, ecs_trav_down_t, 0))) {
+    while (ecs_map_next(&it)) {
+        ecs_trav_down_t *entry = ecs_map_ptr(&it);
         ecs_vec_fini_t(a, &entry->elems, ecs_trav_elem_t);
     }
     ecs_map_fini(&cache->with);
@@ -46567,13 +46576,13 @@ ecs_iter_t flecs_filter_iter_w_flags(
         flecs_process_pending_tables(world);
     }
 
-    ecs_iter_t it = {
-        .real_world = (ecs_world_t*)world,
-        .world = (ecs_world_t*)stage,
-        .terms = filter ? filter->terms : NULL,
-        .next = ecs_filter_next,
-        .flags = flags
-    };
+    ecs_iter_t it;
+    ecs_os_zeromem(&it);
+    it.real_world = (ecs_world_t*)world;
+    it.world = (ecs_world_t*)stage;
+    it.terms = filter ? filter->terms : NULL;
+    it.next = ecs_filter_next;
+    it.flags = flags;
 
     ecs_filter_iter_t *iter = &it.priv.iter.filter;
     iter->pivot_term = -1;
@@ -56027,7 +56036,7 @@ ecs_id_t flecs_id_record_hash(
 typedef struct ecs_id_validate_result_t {
     ecs_entity_t rel;
     ecs_entity_t tgt;
-    char *error_msg;
+    const char *error_msg;
 } ecs_id_validate_result_t;
 
 static
@@ -56099,7 +56108,7 @@ ecs_id_record_t* flecs_id_record_new(
     }
 
     ecs_entity_t rel = check.rel, tgt = check.tgt, role = id & ECS_ID_FLAGS_MASK;
-    ecs_id_record_t *idr, **idr_ptr, *idr_t = NULL;
+    ecs_id_record_t *idr, *idr_t = NULL;
     ecs_id_t hash = flecs_id_record_hash(id);
     if (hash >= ECS_HI_ID_RECORD_ID) {
         idr = flecs_bcalloc(&world->allocators.id_record);
